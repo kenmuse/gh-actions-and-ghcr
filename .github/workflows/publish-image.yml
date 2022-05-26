@@ -1,0 +1,123 @@
+#yaml-language-server: $schema=https://json.schemastore.org/github-workflow
+###############################################################################
+# This workflow deploys an image to the GitHub Container Registry using Actions.
+# It specifies a minimal set of permissions -- access to the repo, the ability
+# to write packages, and the ability to write an ID token to complete the
+# identity challenge with [sigstore/fulcio](https://github.com/sigstore/fulcio).
+#
+# The current repository will also be used to host the image.
+#
+###############################################################################
+
+name: deploy-image
+
+on:
+  release:
+    types: [published]
+  
+  workflow_dispatch:
+
+env:
+  # Configures the registry. By default, docker.io is used when no registry is specified.
+  REGISTRY: ghcr.io
+  # Specify the image name (as {owner}/{repo})
+  IMAGE_NAME: ${{ github.repository }}
+
+# Minimize the requested permissions
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  publish:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the latest version of the code
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # Install the cosign container signing tool (for creating signed images)
+      # The action is using a commit SHA to pin the version (2.3.0) rather
+      # than a tag. Because a SHA is not able to be modified, it guarantees
+      # the version of the Action.
+      # Sigstore is an open source security project sponsored by the OpenSSF
+      # (Open Software Security Foundation).
+      # More details on image signing: https://docs.docker.com/engine/security/trust/
+      - name: Install cosign
+        uses: sigstore/cosign-installer@536b37ec5d5b543420bdfd9b744c5965bd4d8730
+        with:
+          cosign-release: 'v1.8.0'
+
+      # If you're building cross-platform, QEMU may be required. In this case,
+      # it's needed to build the ARM image.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      # Configure Docker Buildx using version 2.0.0 of the Action
+      # This provides extended build capabilities with BuildKit (including
+      # support for multiple instances of the builder and parallel building
+      # of cross-platform images).
+      # See https://docs.docker.com/buildx/working-with-buildx/
+      # Workaround for: https://github.com/docker/build-push-action/issues/461
+      - name: Setup Docker buildx
+        uses: docker/setup-buildx-action@dc7b9719a96d48369863986a06765841d7ea23f6
+        with:
+          version: latest
+
+      # Authenticate with the registry using version 2.0.0 of the Action
+      # Because we are publishing to the same repository, we can use the
+      # GITHUB_TOKEN. To publish to a different repository, we would need
+      # a personal access token with appropriate write privileges.
+      - name: Log into registry ${{ env.REGISTRY }}
+        uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Extract metadata using version 4.0.1 of the Action.
+      # This captures metadata from the GitHub event payload and uses it to
+      # populate the OCI annotations for the image. This action can be used
+      # to configure versioning as well as label contents. The output of this
+      # step is used for building the image in the next step.
+      # The annotations are documented here: 
+      # https://github.com/opencontainers/image-spec/blob/main/annotations.md
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@69f6fc9d46f2f8bf0d5491e4aabe0bb8c6a4678a
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: latest
+
+      # Build and push the image to the registry using version 3.0 of the Action.
+      # This uses the previously configured Buildx builder.
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@e551b19e49efd4e98792db7592c17c09b89db8d8
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+
+      # Sign the resulting Docker image digest.
+      # Note that no private key is being provided. Fulcio is being used to issue
+      # signing certificates for OIDC, and Rekor is being used as a transparency log.
+      # The container is being signed with the GitHub-provided OIDC token. Note
+      # that this will publish the username, repository name, and workflow name
+      # to the public repository. As a result, this will only write to the public
+      # Rekor transparency log when the Docker repository is public. To publish
+      # the transparency data anyway, pass --force to cosign below. It is also
+      # possible to provide a --key parameter as well as annotations (-a) to be
+      # included in the signature. For more details on the keyless approach,
+      # see: https://github.com/sigstore/cosign/blob/main/KEYLESS.md
+      - name: Sign the published Docker image
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+        # This step uses the identity token to provision an ephemeral certificate
+        # against the sigstore community Fulcio instance.
+        run: cosign sign ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push.outputs.digest }}
