@@ -20,10 +20,13 @@ on:
 env:
   # Configures the registry. By default, docker.io is used when no registry is specified.
   REGISTRY: ghcr.io
-  # Specify the image name (as {owner}/{repo})
+  # Specify the image name as {owner}/{repo}.
   IMAGE_NAME: ${{ github.repository }}
 
 # Minimize the requested permissions
+# Contents: read the contents of the repo (to build the image)
+# Packages: write the image to GHCR
+# ID-Token: create a token for cosign container signing
 permissions:
   contents: read
   packages: write
@@ -52,7 +55,9 @@ jobs:
           cosign-release: 'v1.8.0'
 
       # If you're building cross-platform, QEMU may be required. In this case,
-      # it's needed to build the ARM image.
+      # it's needed to build the ARM64 image since we're on an AMD64 runner.
+      # This is using a version tag, so the Action will use whatever version the
+      # tag is associated with.
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
@@ -70,7 +75,9 @@ jobs:
       # Authenticate with the registry using version 2.0.0 of the Action
       # Because we are publishing to the same repository, we can use the
       # GITHUB_TOKEN. To publish to a different repository, we would need
-      # a personal access token with appropriate write privileges.
+      # a personal access token with appropriate write privileges. If you wanted
+      # to login to other registries for additional pushes (or pulling base
+      # images), repeat this step for each registry.
       - name: Log into registry ${{ env.REGISTRY }}
         uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b
         with:
@@ -83,17 +90,21 @@ jobs:
       # populate the OCI annotations for the image. This action can be used
       # to configure versioning as well as label contents. The output of this
       # step is used for building the image in the next step.
-      # The annotations are documented here: 
+      # Note -- you can force a specific tag in this step. Otherwise, it tags
+      # the version number and "latest" for releases.
+      # The target registry for the push is used as the prefix for the image.
+      # The OCI annotations are documented here: 
       # https://github.com/opencontainers/image-spec/blob/main/annotations.md
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@69f6fc9d46f2f8bf0d5491e4aabe0bb8c6a4678a
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: latest
 
       # Build and push the image to the registry using version 3.0 of the Action.
-      # This uses the previously configured Buildx builder.
+      # This uses the previously configured Buildx builder. This step creates
+      # a multi-architecture image that supports Intel and AMD devices. The tags
+      # and labels created in the previous step are used in this one.
       - name: Build and push Docker image
         id: build-and-push
         uses: docker/build-push-action@e551b19e49efd4e98792db7592c17c09b89db8d8
