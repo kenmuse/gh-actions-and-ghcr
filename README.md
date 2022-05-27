@@ -1,9 +1,16 @@
 # Deploying to GitHub Container Registry
-This sample shows how to build and publish an image to GitHub Container Registry (GHCR). It uses the same sample Python application as the [ACR sample](https://github.com/kenmuse/gh-actions-and-acr). The image contains a minimal, Flash-based web application. Each version built will include the `latest` tag.
+This sample shows how to build and publish an image to GitHub Container Registry (GHCR). It uses the same sample Python application as the [ACR sample](https://github.com/kenmuse/gh-actions-and-acr). The image contains a minimal, Flash-based web application. The base image is pulled from DockerHub. 
+
+*Release* versions will include the version tag, and the the most recent release will be tagged with `latest`. The most recent manually built images will be tagged with the branch name (`main`). All builds will have the SHA256 identifier. These display in GitHub as 'untagged". The images are signed, so an additional .sig is uploaded with each image.
 
 > **Note**  
 > The workflow uses Actions that are not certified by GitHub. They are provided by third-parties and are governed by
 > separate terms of service, privacy policy, and support documentation.
+
+## Packages and Pulling
+The image is pushed to the repository packages and visible there. It is also stored at the organization level. The images can have fine-grained permissions applied at the organization level. This allows image permissions to be assigned to teams and individuals (in addition to repo-based permissions).
+
+The default `pull` command shown by GitHub is incorrect and will pull the container's signature metadata (.sig). To pull an image, use the appropriate tag instead. This will be `main` (latest manual build), `latest` (latest release build), or a specific release version.
 
 ## Local Testing
 To pull an image and use it in a local environment, you will need to make sure you have installed Docker (or Docker Desktop).
@@ -13,8 +20,8 @@ The steps to use the built image on a local machine:
 1. Fork the repository.
 2. Run the [workflow](.github/workflows/publish-image.yml) to publish the image. To do this, [create a new release](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#creating-a-release). Typically releases use the format `v#.#` or `v#.#.#` and will have a matching tag. Alternatively, you can manually invoke the workflow to create a SHA-versioned image.
 3. On the machine that will need to use the image, run the command `docker login ghcr.io` to authenticate with the registry.
-  - Provide your GitHub user name 
-  - For the password, create a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) with *read:packages* permissions.
+   - Provide your GitHub user name 
+   - For the password, create a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) with *read:packages* permissions.
 4. Start the container with the following command `docker run -it -p 80:80 --name ghcr-demo --rm ghcr.io/{owner}/{repo}:latest`. Remember to replace `{owner}` and `{repo}` with appropriate values. For example. `ghcr.io/kenmuse/gh-actions-and-ghcr:latest`
 
 ## Dev Containers
