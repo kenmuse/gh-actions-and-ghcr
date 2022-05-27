@@ -1,7 +1,9 @@
 # Deploying to GitHub Container Registry
 This sample shows how to build and publish an image to GitHub Container Registry (GHCR). It uses the same sample Python application as the [ACR sample](https://github.com/kenmuse/gh-actions-and-acr). The image contains a minimal, Flash-based web application. The base image is pulled from DockerHub. 
 
-*Release* versions will include the version tag, and the the most recent release will be tagged with `latest`. The most recent manually built images will be tagged with the branch name (`main`). All builds will have the SHA256 identifier. These display in GitHub as 'untagged". The images are signed, so an additional .sig is uploaded with each image.
+*Release* versions will include the version tag, and the the most recent release will be tagged with `latest`. The most recent manually built images will be tagged with the branch name (`main`). All builds will have a SHA256 identifier (shown in *untagged*). The images are signed, so an additional `.sig` for each SHA256 identifier is uploaded with each image.
+
+The [workflow](.github/workflows/publish-image.yml) is heavily commented to provide a walkthrough of the steps.
 
 > **Note**  
 > The workflow uses Actions that are not certified by GitHub. They are provided by third-parties and are governed by
