@@ -1,7 +1,7 @@
 # Deploying to GitHub Container Registry
 This sample shows how to build and publish an image to GitHub Container Registry (GHCR). It uses the same sample Python application as the [ACR sample](https://github.com/kenmuse/gh-actions-and-acr). The image contains a minimal, Flash-based web application. Each version built will include the `latest` tag.
 
-> **Note:**  
+> **Note**  
 > The workflow uses Actions that are not certified by GitHub. They are provided by third-parties and are governed by
 > separate terms of service, privacy policy, and support documentation.
 
@@ -43,7 +43,7 @@ These can be overridden in the Dockerfile, as shown [on lines 11-12](Dockerfile#
 While not shown in this workflow, it is possible to create a job that will also cleanup older images automatically using a third-party action.
 For this to work correctly, you will need the *unprefixed* image name (i.e., no owner). This is available from the event context as `github.event.repository.name`. This can be especially important if you're continuously building since GHCR does not have a retention policy for images. To cleanup all but the latest unversioned images (anything without a "v" prefix), you can use a job like the one below.
 
-> **Note:**  
+> **Note**  
 > The `GITHUB_TOKEN` does not have permission to delete images. You must provide a personal access token with
 > `read:packages` and `delete:packages` permissions to be able to list the images and delete them.
 > See https://github.com/snok/container-retention-policy for more details about this action.
